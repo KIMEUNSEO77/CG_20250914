@@ -229,6 +229,8 @@ int randomRect()
     return random;
 }
 
+
+
 void PickCenter() 
 {
     if (center < 0) center = randomRect(); // 한 번만 선택
