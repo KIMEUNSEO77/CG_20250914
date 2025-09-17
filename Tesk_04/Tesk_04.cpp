@@ -29,7 +29,7 @@ struct Pos
 vector<Pos> origins; // 원래 위치 저장
 // 대각선으로 움직일 방향(오른쪽 아래, 왼쪽위, 왼쪽 아래, 오른쪽 위)
 Pos dPos[4] = { {0.01f, -0.01f}, {-0.01f, 0.01f}, {-0.01f, -0.01f}, {0.01f, 0.01f}};
-Pos zPos[4] = { {0.05f, -0.05f}, {-0.05f, 0.05f}, {-0.05f, -0.05f}, {0.05f, 0.05f} };
+// Pos zPos[4] = { {0.05f, -0.05f}, {-0.05f, 0.05f}, {-0.05f, -0.05f}, {0.05f, 0.05f} };
 
 // 마우스 클릭 위치
 float mouseX = 0.0f;
@@ -40,6 +40,9 @@ bool started[5];
 
 // 따라갈 사각형
 int center = -1;
+
+// 3번 움직일 때마다 방향 바꾸기(지그재그)
+int zigCount = 0;
 
 GLvoid drawScene(GLvoid);
 GLvoid Reshape(int w, int h);
@@ -90,17 +93,41 @@ void AddRects()
 }
 
 // 사각형 그리기
-void DrawRect(const Rec& rect)
+void DrawRect(const Rec& rect, int index)
 {
-    glPushMatrix();
-    glTranslatef(rect.posX, rect.posY, 0.0f);  // 사각형의 중심을 posX, posY로 이동
-    glScalef(rect.scale, rect.scale, 1.0f);
-    glColor3fv(rect.color);
-    glRectf(
-        -rect.width / 2, -rect.height / 2,
-        rect.width / 2, rect.height / 2
-    );
-    glPopMatrix();
+    if (index == center)
+    {
+        glPushMatrix();
+        glTranslatef(rect.posX, rect.posY, 0.0f);  // 사각형의 중심을 posX, posY로 이동
+        glScalef(rect.scale, rect.scale, 1.0f);
+        glRectf(
+            -rect.width / 2, -rect.height / 2,
+            rect.width / 2, rect.height / 2
+        );
+        glLineWidth(5.0f);           // 선 굵기 (픽셀 단위)
+        glColor3f(1.0f, 1.0f, 1.0f); // 흰색
+        glBegin(GL_LINE_LOOP);
+        glVertex2f(-rect.width / 2, -rect.height / 2);
+        glVertex2f(rect.width / 2, -rect.height / 2);
+        glVertex2f(rect.width / 2, rect.height / 2);
+        glVertex2f(-rect.width / 2, rect.height / 2);
+        glEnd();
+
+        glLineWidth(1.0f); // 다른 도형에 영향 안 가도록 초기화
+		glPopMatrix();
+    }
+    else
+    {
+        glPushMatrix();
+        glTranslatef(rect.posX, rect.posY, 0.0f);  // 사각형의 중심을 posX, posY로 이동
+        glScalef(rect.scale, rect.scale, 1.0f);
+        glColor3fv(rect.color);
+        glRectf(
+            -rect.width / 2, -rect.height / 2,
+            rect.width / 2, rect.height / 2
+        );
+        glPopMatrix();
+    }
 }
 
 // 마우스 클릭한 좌표 정규화
@@ -189,21 +216,28 @@ void Animation_1()
 // 모든 사각형을 지그재그로 이동
 void Animation_2()
 {
+	zigCount++;
+
     for (int i = 0; i < rects.size(); i++)
     {
-        float nx = rects[i].posX + zPos[(rects[i].moveIndex + 2) % 4].posX;
-        float ny = rects[i].posY + zPos[(rects[i].moveIndex + 2) % 4].posY;
+        //float nx = rects[i].posX + dPos[(rects[i].moveIndex + 2) % 4].posX;
+        //float ny = rects[i].posY + dPos[(rects[i].moveIndex + 2) % 4].posY;
+        float nx = rects[i].posX + dPos[rects[i].moveIndex].posX;
+        float ny = rects[i].posY + dPos[rects[i].moveIndex].posY;
 
         if (IsWall(rects[i], nx, ny))
         {
             rects[i].moveIndex = (rects[i].moveIndex + 1) % 4;
         }
-        else
+        else if (zigCount % 5 == 0) // 3번 움직일 때마다 방향 바꾸기
         {
-            rects[i].posX = nx;
-            rects[i].posY = ny;
-
-            rects[i].moveIndex = (rects[i].moveIndex + 2) % 4;
+            rects[i].posX += dPos[(rects[i].moveIndex + 2) % 4].posX;
+            rects[i].posY += dPos[(rects[i].moveIndex + 2) % 4].posY;
+        }
+		else
+        {
+            rects[i].posX += dPos[rects[i].moveIndex].posX;
+            rects[i].posY += dPos[rects[i].moveIndex].posY;
         }
     }
 }
@@ -229,12 +263,9 @@ int randomRect()
     return random;
 }
 
-
-
 void PickCenter() 
 {
     if (center < 0) center = randomRect(); // 한 번만 선택
-    // 혹은 키 입력으로 centerIdx를 바꾸도록!
 }
 
 // 선택된 사각형을 따라가기
@@ -307,6 +338,12 @@ void Timer(int value)
         glutPostRedisplay(); // 화면 갱신
     }
 
+    if (!started[4])
+    {
+		center = -1; // 따라갈 사각형 초기화
+        glutPostRedisplay(); // 화면 갱신
+    }
+
     // 타이머 재설정
     glutTimerFunc(50, Timer, 0);
 }
@@ -317,12 +354,12 @@ GLvoid Keyboard(unsigned char key, int x, int y)
     {
     case '1':
         started[0] = !started[0];
-        if (started[4]) started[4] = false;
-        if (started[1]) started[1] = false;
+        //if (started[4]) started[4] = false;
+        //if (started[1]) started[1] = false;
         break;
     case '2':
         started[1] = !started[1];
-        if (started[0]) started[0] = false;
+        //if (started[0]) started[0] = false;
         break;
     case '3':
         started[2] = !started[2];
@@ -332,7 +369,7 @@ GLvoid Keyboard(unsigned char key, int x, int y)
         break;
     case '5':
         started[4] = !started[4];
-        if (started[0]) started[0] = false;
+        //if (started[0]) started[0] = false;
         break;
     case 's':
         for (int i = 0; i < 5; i++)
@@ -385,7 +422,7 @@ GLvoid drawScene()
 
     for (int i = 0; i < rects.size(); ++i)
     {
-        DrawRect(rects[i]);
+        DrawRect(rects[i], i);
     }
 
     glutSwapBuffers();
