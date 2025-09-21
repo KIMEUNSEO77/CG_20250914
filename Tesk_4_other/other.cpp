@@ -40,6 +40,8 @@ int center = -1;
 
 // 3번 움직일 때마다 방향 바꾸기(지그재그)
 int zigCount = 0;
+bool moving1 = false;
+bool moving2 = false;
 
 GLvoid drawScene(GLvoid);
 GLvoid Reshape(int w, int h);
@@ -79,8 +81,17 @@ void AddRects()
     temp.width = 0.2f;
     temp.height = 0.2f;
 
-	temp.vx = 0.02f;
-	temp.vy = 0.01f;
+    int random = rand() % 2;
+    if (!random)
+    {
+        temp.vx = 0.02f;
+        temp.vy = 0.01f;
+    }
+    else 
+    {
+        temp.vx = -0.02f;
+        temp.vy = -0.01f;
+	}
 
     rects.push_back(temp);
 
@@ -266,33 +277,25 @@ void Animation_5()
 {
     PickCenter();
 
-	// 선택된 사각형 이동
-    if (IsWall(rects[center], rects[center].posX + rects[center].vx, rects[center].posY))
-    {
-        rects[center].vx = -rects[center].vx;
-	}
-    if (IsWall(rects[center], rects[center].posX, rects[center].posY + rects[center].vy))
-    {
-        rects[center].vy = -rects[center].vy;
-    }
-	rects[center].posX += rects[center].vx;
-	rects[center].posY += rects[center].vy;
-
     for (int i = 0; i < rects.size(); i++)
     {
         if (i == center) continue;
-        if (IsWall(rects[i], rects[i].posX + rects[center].vx, rects[i].posY))
+
+		rects[i].vx = rects[center].vx * float(1.0f - (float)i * 0.1f);
+		rects[i].vy = rects[center].vy * float(1.0f - (float)i * 0.1f);
+
+        if (IsWall(rects[i], rects[i].posX + rects[i].vx, rects[i].posY))
         {
             rects[i].vx = -rects[i].vx;
         }
-        if (IsWall(rects[i], rects[i].posX, rects[i].posY + rects[center].vy))
+        if (IsWall(rects[i], rects[i].posX, rects[i].posY + rects[i].vy))
         {
             rects[i].vy = -rects[i].vy;
         }
-        
-		rects[i].vx += rects[center].vx;
-		rects[i].vy += rects[center].vy;
-	}
+
+        rects[i].posX += rects[i].vx;
+        rects[i].posY += rects[i].vy;
+    }
 }
 
 // 타이머
@@ -345,10 +348,12 @@ GLvoid Keyboard(unsigned char key, int x, int y)
     case '1':
         started[0] = !started[0];
 		if (started[1]) started[1] = false;
+        moving1 = !moving1;
         break;
     case '2':
         started[1] = !started[1];
 		if (started[0]) started[0] = false;
+		moving2 = !moving2;
         break;
     case '3':
         started[2] = !started[2];
